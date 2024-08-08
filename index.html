@@ -17,38 +17,66 @@ if ('bluetooth' in navigator) {
     const connectButton = document.createElement('button');
     connectButton.textContent = '连接蓝牙设备';
     document.body.appendChild(connectButton);
-
+    document.body.appendChild(document.createElement('br'));
+    const inputbox = document.createElement('input');
+    inputbox.type='text';
+    document.body.appendChild(inputbox);
+    const sendbt = document.createElement('button');
+    sendbt.textContent = '发送';
+    document.body.appendChild(sendbt);
+    document.body.appendChild(document.createElement('br'));
+    const rxbox = document.createElement('textarea');
+    document.body.appendChild(rxbox);
+    sendbt.addEventListener('click', async () => {
+        await mySender.writeValue( new Uint8Array(
+                            new TextEncoder("utf-8").encode(inputbox.value)
+                        ));
+                    });
     connectButton.addEventListener('click', async () => {
         try {
             // 请求蓝牙设备
-            const device = await navigator.bluetooth.requestDevice({
-                // 使用16位 UUID 来过滤电池服务
-                filters: [{ services: [0xFFF0] }]
+            //const device = await navigator.bluetooth.requestDevice({
+            //    // 使用16位 UUID 来过滤电池服务
+            //    filters: [{ services: [0xFFF0] }]
+            //});
+
+            navigator.bluetooth.requestDevice({filters: [{services: [0xFFF0]}]})
+            .then(device => {
+            console.log('Connecting...');
+            deviceName = device.name;
+            return device.gatt.connect();
+            })
+            .then(server => {
+            console.log('Getting Service...');
+            return server.getPrimaryService(0xFFF0);
+            })
+            .then(service => {
+            mainService=service;
+            console.log('Getting Characteristic...');
+            return service.getCharacteristic(0xFFF1);
+            })
+            .then(characteristic => {
+            myCharacteristic = characteristic;
+            return myCharacteristic.startNotifications().then(_ => {
+                console.log('> Notifications started');
+                console.log("Connected to: " + deviceName);
+                myCharacteristic.addEventListener('characteristicvaluechanged',
+                    (event)=>{
+                        let value = new TextDecoder().decode(event.target.value);
+                        rxbox.value+=value;
+                    });
             });
-
-            console.log('设备选择成功:', device.name);
-
-            // 连接到GATT服务器
-            const server = await device.gatt.connect();
-            console.log('连接到GATT服务器');
-
-            // 获取电池服务
-            const service = await server.getPrimaryService('battery_service');
-            console.log('获取电池服务');
-
-            // 获取电池电量特征
-            const characteristic = await service.getCharacteristic('battery_level');
-            console.log('获取电池电量特征');
-
-            // 读取电池电量
-            const value = await characteristic.readValue();
-            console.log('电池电量:', value.getUint8(0) + '%');
-
-            // 监听特征值变化
-            await characteristic.startNotifications();
-            characteristic.addEventListener('characteristicvaluechanged', (event) => {
-                const batteryLevel = event.target.value.getUint8(0);
-                console.log('电池电量更新:', batteryLevel + '%');
+                
+            })
+            .then(_=>{
+                return mainService.getCharacteristic(0xFFF2);
+            })
+            .then(sender=>{
+                mySender=sender;
+                console.log('> get Sender');
+            })
+            .catch(error => {
+            console.log('Argh! ' + error);
             });
 
         } catch (error) {
@@ -59,5 +87,8 @@ if ('bluetooth' in navigator) {
     alert('浏览器不支持Web Bluetooth API');
     //console.error('浏览器不支持Web Bluetooth API');
 }
+    function send(){
+
+    }
 </script>
 </html>
