@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bt</title>
+</head>
+<style>
+
+</style>
+<body>
+    
+</body>
+<script>
+// 检查浏览器是否支持Web Bluetooth API
+if ('bluetooth' in navigator) {
+    const connectButton = document.createElement('button');
+    connectButton.textContent = '连接蓝牙设备';
+    document.body.appendChild(connectButton);
+
+    connectButton.addEventListener('click', async () => {
+        try {
+            // 请求蓝牙设备
+            const device = await navigator.bluetooth.requestDevice({
+                // 使用16位 UUID 来过滤电池服务
+                filters: [{ services: [0xFFF0] }]
+            });
+
+            console.log('设备选择成功:', device.name);
+
+            // 连接到GATT服务器
+            const server = await device.gatt.connect();
+            console.log('连接到GATT服务器');
+
+            // 获取电池服务
+            const service = await server.getPrimaryService('battery_service');
+            console.log('获取电池服务');
+
+            // 获取电池电量特征
+            const characteristic = await service.getCharacteristic('battery_level');
+            console.log('获取电池电量特征');
+
+            // 读取电池电量
+            const value = await characteristic.readValue();
+            console.log('电池电量:', value.getUint8(0) + '%');
+
+            // 监听特征值变化
+            await characteristic.startNotifications();
+            characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                const batteryLevel = event.target.value.getUint8(0);
+                console.log('电池电量更新:', batteryLevel + '%');
+            });
+
+        } catch (error) {
+            console.error('蓝牙连接错误:', error);
+        }
+    });
+} else {
+    alert('浏览器不支持Web Bluetooth API');
+    //console.error('浏览器不支持Web Bluetooth API');
+}
+</script>
+</html>
